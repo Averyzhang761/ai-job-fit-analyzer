@@ -1,0 +1,10 @@
+.env
+.env.*
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+venv/
+gradio-env/
+results*.csv
+

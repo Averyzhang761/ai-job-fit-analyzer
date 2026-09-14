@@ -7,4 +7,5 @@ __pycache__/
 venv/
 gradio-env/
 results*.csv
-
+output/
+.playwright-cli/

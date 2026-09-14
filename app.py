@@ -31,7 +31,6 @@ from models import (
     HardFilterResult,
     JobAnalysis,
     ModelAssessment,
-    ModelAssessmentV3,
     Recommendation,
     RoleType,
     TernarySignal,

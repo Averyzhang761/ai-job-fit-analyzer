@@ -36,32 +36,11 @@ class TernarySignal(str, Enum):
     UNKNOWN = "unknown"
 
 
-class PrimaryDeliverable(str, Enum):
-    AI_APPLICATION = "ai_application"
-    MODEL_ENGINEERING = "model_engineering"
-    RESEARCH = "research"
-    AI_INFRASTRUCTURE = "ai_infrastructure"
-    NON_AI_PLATFORM = "non_ai_platform"
-    GENERAL_SOFTWARE = "general_software"
-    UNKNOWN = "unknown"
-
-
 class WorkArrangement(str, Enum):
     ONSITE = "onsite"
     HYBRID = "hybrid"
     REMOTE = "remote"
     MIXED = "mixed"
-    UNKNOWN = "unknown"
-
-
-class DerivedRoleType(str, Enum):
-    PRODUCT_FACING_AIE = "Product-facing AIE"
-    INTERNAL_FACING_AIE = "Internal-facing AIE"
-    FDE = "FDE"
-    RESEARCH_ML = "Research/ML role"
-    ML_HEAVY_AIE = "ML-heavy AIE"
-    PLATFORM_HEAVY_AIE = "platform-heavy AIE"
-    NOT_FIT = "not fit"
     UNKNOWN = "unknown"
 
 
@@ -176,189 +155,6 @@ class JobAnalysis(ModelAssessment):
         return self
 
 
-class DeliveryFacts(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    customer_facing: TernarySignal
-    product_collaboration: TernarySignal = Field(
-        description=(
-            "Whether the role directly collaborates with a product team or owns "
-            "product development; collaboration with scientists or generic users "
-            "alone is not product collaboration."
-        )
-    )
-    embedded_customer_implementation: TernarySignal = Field(
-        description=(
-            "Yes only when the role owns hands-on implementation in or alongside "
-            "a customer's environment; advising, workshops, architecture guidance, "
-            "and support alone are not embedded implementation."
-        )
-    )
-    internal_user_facing: TernarySignal
-
-
-class RoleFactsV3(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    primary_deliverable: PrimaryDeliverable = Field(
-        description=(
-            "The dominant artifact or outcome the role is accountable for, not every "
-            "technology or secondary responsibility mentioned in the JD."
-        )
-    )
-    delivers_ai_application: TernarySignal = Field(
-        description=(
-            "Whether the role primarily ships a user or business workflow powered by "
-            "AI; model training, model research, and infrastructure alone are not an "
-            "AI application."
-        )
-    )
-    trains_or_optimizes_models: TernarySignal
-    operates_ai_infrastructure: TernarySignal = Field(
-        description=(
-            "Whether the role operates infrastructure specifically for the AI model "
-            "or AI-application lifecycle; ordinary software, media, cloud, or product "
-            "platform infrastructure is not AI infrastructure."
-        )
-    )
-    delivery: DeliveryFacts
-
-
-class LocationFactsV3(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    work_arrangement: WorkArrangement
-    candidate_location_eligible: TernarySignal = Field(
-        description=(
-            "Whether the stated geography permits this candidate to work from the San "
-            "Francisco Bay Area or through US remote work without a conflicting region "
-            "or time-zone restriction. Remote alone does not imply eligibility."
-        )
-    )
-
-
-class ConstraintFactsV3(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    location: LocationFactsV3
-    work_authorization: WorkAuthorizationResult
-
-
-class ModelAssessmentV3(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    role: RoleFactsV3
-    constraints: ConstraintFactsV3
-    evidence: list[EvidenceItem] = Field(min_length=1)
-    risks: list[str]
-    confidence: float = Field(gt=0, le=1, strict=True)
-
-    @field_validator("risks")
-    @classmethod
-    def clean_v3_risks(cls, risks: list[str]) -> list[str]:
-        return [risk.strip() for risk in risks if risk.strip()]
-
-    @model_validator(mode="after")
-    def validate_v3_evidence_quotes(self, info: ValidationInfo) -> Self:
-        job_description = (info.context or {}).get("job_description")
-        if not job_description:
-            return self
-        missing = [item.quote for item in self.evidence if item.quote not in job_description]
-        if missing:
-            raise ValueError(
-                "Evidence quote 必须逐字存在于原始 JD：" + "; ".join(missing)
-            )
-        return self
-
-
-class CandidatePolicy(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    target_roles: frozenset[DerivedRoleType] = frozenset(
-        {DerivedRoleType.PRODUCT_FACING_AIE, DerivedRoleType.FDE}
-    )
-    review_roles: frozenset[DerivedRoleType] = frozenset(
-        {DerivedRoleType.INTERNAL_FACING_AIE, DerivedRoleType.ML_HEAVY_AIE}
-    )
-
-
-class JobDecisionV3(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    facts: ModelAssessmentV3
-    derived_role_type: DerivedRoleType
-    recommendation: Recommendation
-    needs_human_review: StrictBool
-    decision_reasons: list[str] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validate_v3_terminal_state(self) -> Self:
-        expects_review = self.recommendation is Recommendation.HUMAN_REVIEW
-        if self.needs_human_review != expects_review:
-            raise ValueError("human_review 与 needs_human_review 必须保持一致")
-        return self
-
-
-class WorkContentLevel(str, Enum):
-    CORE = "core"
-    PRESENT = "present"
-    NOT_EVIDENCED = "not_evidenced"
-
-
-class WorkContentV4(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    customer_implementation: WorkContentLevel
-    customer_advisory: WorkContentLevel
-    product_development: WorkContentLevel
-    internal_tools: WorkContentLevel
-    model_engineering: WorkContentLevel
-    research: WorkContentLevel
-    ai_infrastructure: WorkContentLevel
-
-
-class RoleProfileV4(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    primary_deliverable: PrimaryDeliverable
-    work_content: WorkContentV4
-
-
-class ModelAssessmentV4(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    role: RoleProfileV4
-    constraints: ConstraintFactsV3
-    evidence: list[EvidenceItem] = Field(min_length=1)
-    risks: list[str]
-    confidence: float = Field(gt=0, le=1, strict=True)
-
-
-class CandidatePolicyV4(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    target_content: frozenset[str] = frozenset(
-        {"customer_implementation", "customer_advisory", "product_development"}
-    )
-
-
-class JobDecisionV4(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    facts: ModelAssessmentV4
-    role_tags: frozenset[str]
-    recommendation: Recommendation
-    needs_human_review: StrictBool
-    decision_reasons: list[str] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validate_v4_terminal_state(self) -> Self:
-        expects_review = self.recommendation is Recommendation.HUMAN_REVIEW
-        if self.needs_human_review != expects_review:
-            raise ValueError("human_review 与 needs_human_review 必须保持一致")
-        return self
-
-
 class RemoteScope(str, Enum):
     US = "us"
     GLOBAL = "global"
@@ -396,26 +192,7 @@ class SourceWorkAuthorizationFacts(BaseModel):
     citizenship_or_green_card: CitizenshipStatement
 
 
-class SourceFactsV5(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    role: RoleProfileV4
-    location: SourceLocationFacts
-    work_authorization: SourceWorkAuthorizationFacts
-    evidence: list[EvidenceItem] = Field(min_length=1)
-    risks: list[str]
-    confidence: float = Field(gt=0, le=1, strict=True)
-
-
-class CandidateConstraintJudgmentV5(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    candidate_location_eligible: TernarySignal
-    work_authorization_eligible: TernarySignal
-    reasons: list[str] = Field(min_length=1)
-
-
-class CandidateLocationJudgmentV5(BaseModel):
+class CandidateLocationJudgment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     candidate_location_eligible: TernarySignal

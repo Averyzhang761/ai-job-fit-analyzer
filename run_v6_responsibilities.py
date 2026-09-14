@@ -4,8 +4,17 @@ import time
 from pathlib import Path
 
 from evaluation import load_eval_cases
-from run_focused_baseline import select_cases
 from v6_pipeline import analyze_job_v6
+
+
+def select_cases(cases, ids=None, limit=None):
+    selected = cases
+    if ids:
+        requested = set(ids)
+        selected = [case for case in selected if case["jd_id"] in requested]
+    if limit is not None:
+        selected = selected[:limit]
+    return selected
 
 
 def main():

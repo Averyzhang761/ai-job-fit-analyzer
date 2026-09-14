@@ -85,18 +85,18 @@ The labels remain provisional and must be reviewed before they are treated as
 ground truth. Running this set still does not establish broad real-world
 accuracy or long-term model stability.
 
-## Experimental Pipelines
+## V6 Architecture Candidate
 
-The Gradio application continues to use the tested V2 path. V3 through V6 are
-evaluation experiments and are not wired into the default UI:
+The Gradio application continues to use the tested production path. V6 is kept
+as an evaluation candidate and is not wired into the default UI. It extracts
+exact responsibility quotations with multiple activity tags and lets Python
+derive the recommendation from evidence and candidate constraints.
 
-- V3 separates extracted facts from a Python-derived role label.
-- V4 removes the unique role label and evaluates a multi-dimensional work profile.
-- V5 tests a separate candidate-constraint reviewer.
-- V6 extracts exact responsibility quotations with multiple activity tags and
-  lets Python derive the recommendation from evidence and candidate constraints.
-
-V6 is the current architecture candidate because it avoids exclusive role
+V6 avoids exclusive role
 classification and unsupported importance estimates. It has not passed a full
 ground-truth evaluation. Exact quotations prove that returned evidence exists,
 but they do not prove extraction completeness or activity-label accuracy.
+
+Earlier V3-V5 experiments were removed from the main branch after their results
+were recorded in the course retrospective. Future architecture experiments
+should use dedicated branches and merge back only after evaluation.

@@ -1,59 +1,49 @@
 # Domain glossary
 
-## Role facts
+## Responsibility
 
-Observed or extracted statements about what the job primarily delivers and how
-the work is performed. Role facts may overlap and must not contain a personal
-fit decision.
+An explicit statement about work the role performs. V6 stores the exact source
+quotation and one or more activity tags for each responsibility. A real role can
+contain several activities, so responsibilities are not collapsed into one
+exclusive role category.
 
-## Primary deliverable
+## Work activity
 
-The main artifact or outcome produced by the role: an AI application, model
-engineering, research, AI infrastructure, a non-AI platform, general software,
-or unknown.
-
-## Delivery facts
-
-Independent facts about customer contact, product collaboration, embedded
-customer implementation, and internal users. These are not mutually exclusive.
-
-## Derived role type
-
-A display label calculated by application rules from role facts. It is not a
-fact extracted directly from the job description.
-
-V3 retains this label only as an experiment and compatibility view. V4 removes
-it from the decision path because a real job can contain several kinds of work.
-
-## Work-content profile
-
-V4 represents customer implementation, customer advisory, product development,
-internal tools, model engineering, research, and AI infrastructure independently.
-Each dimension is core, present, or not evidenced. The
-application may show all applicable tags; it does not force them into one role
-category.
+A reusable tag attached to a source-backed responsibility, such as customer
+implementation, customer advisory, product development, internal tools, model
+engineering, research, AI infrastructure, or general software. Tags describe
+work present in the JD; they are not importance scores or personal-fit decisions.
 
 ## Candidate policy
 
-The user's personal acceptance and review policy. It converts validated facts
-and a derived role type into apply, skip, or human review.
+The user's personal acceptance and review policy. It combines validated work
+activities with candidate-specific location and work-authorization constraints
+to produce `apply`, `skip`, or `human_review`.
 
 ## Location facts versus eligibility
 
-`work_arrangement` records what the JD states: onsite, hybrid, remote, mixed,
-or unknown. `candidate_location_eligible` is a separate policy-relative
-judgment: whether the stated geography permits this candidate to work from the
-San Francisco Bay Area or through compatible US remote work. Keeping these
-fields separate prevents the word "remote" from automatically meaning eligible.
+`work_arrangement`, `stated_locations`, and `remote_scope` record source facts.
+Candidate location eligibility is derived directly for unambiguous US/global
+remote cases and uses a focused reviewer only when those facts are insufficient.
+
+## Work authorization
+
+The source contract records explicit sponsorship and citizenship/green-card
+statements. Python derives candidate eligibility. Sponsorship is not treated as
+proof of H-1B transfer support unless the JD states that narrower fact.
+
+## Evidence boundary
+
+Pydantic verifies that every returned responsibility quotation exists verbatim
+in the original JD. This establishes evidence existence, not extraction
+completeness or activity-tag correctness.
 
 ## Ground truth
 
-Human-reviewed source facts with supporting quotations. Expected role type and
-recommendation are derived from these facts and the candidate policy; they are
-not separately hand-entered labels.
+Human-reviewed source facts with supporting quotations. Provisional labels and
+model-generated drafts are diagnostic material, not accepted ground truth.
 
 ## Contract error
 
 Data that violates the declared shape, types, allowed values, or evidence
-contract. A plausible combination of role facts is not a contract error merely
-because it is unusual.
+contract. Uncertainty and overlapping responsibilities are valid domain states.

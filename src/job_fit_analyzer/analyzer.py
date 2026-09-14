@@ -7,13 +7,13 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from llm_client import (
+from .llm_client import (
     DEFAULT_OPENROUTER_MODEL,
     DEFAULT_RUNPOD_MODEL,
     JobAnalyzerError,
     call_structured_llm,
 )
-from models import (
+from .models import (
     CandidateLocationJudgment,
     CitizenshipStatement,
     JobDecision,

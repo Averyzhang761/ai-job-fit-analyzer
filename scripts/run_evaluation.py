@@ -1,13 +1,9 @@
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-from analyzer import analyze_job
+from job_fit_analyzer.analyzer import analyze_job
 
 
 def load_cases(path: str) -> list[dict]:

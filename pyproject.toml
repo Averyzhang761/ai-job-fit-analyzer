@@ -12,10 +12,5 @@ dependencies = [
 [project.optional-dependencies]
 dev = []
 
-[tool.setuptools]
-py-modules = [
-    "analyzer",
-    "app",
-    "llm_client",
-    "models",
-]
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -5,10 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import analyzer
-import app
-import llm_client
-from models import (
+from job_fit_analyzer import analyzer, llm_client, ui
+from job_fit_analyzer.models import (
     CandidateLocationJudgment,
     JobFacts,
     Recommendation,
@@ -199,7 +197,7 @@ class JobAnalyzerTests(unittest.TestCase):
         self.assertIn("Do not classify the whole role", analyzer.EXTRACTION_PROMPT)
         self.assertNotIn("primary_deliverable", analyzer.EXTRACTION_PROMPT)
 
-    @patch("llm_client.OpenAI")
+    @patch("job_fit_analyzer.llm_client.OpenAI")
     def test_client_rejects_truncated_output_before_pydantic(self, openai_class):
         choice = SimpleNamespace(
             finish_reason="length",
@@ -218,7 +216,7 @@ class JobAnalyzerTests(unittest.TestCase):
                     max_tokens=1200,
                 )
 
-    @patch("llm_client.OpenAI")
+    @patch("job_fit_analyzer.llm_client.OpenAI")
     def test_client_sends_generated_json_schema(self, openai_class):
         content = json.dumps(
             {
@@ -261,7 +259,7 @@ class JobAnalyzerTests(unittest.TestCase):
             TernarySignal.YES,
             TernarySignal.YES,
         )
-        summary, responsibilities, risks, raw_json = app.render_analysis(decision)
+        summary, responsibilities, risks, raw_json = ui.render_analysis(decision)
         self.assertIn("Apply", summary)
         self.assertIn("Build AI workflows", responsibilities)
         self.assertEqual(json.loads(raw_json)["recommendation"], "apply")

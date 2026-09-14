@@ -9,17 +9,19 @@ and produces a deterministic apply, skip, or human-review decision.
 There is one active pipeline:
 
     app.py
-      -> analyzer.py
-         -> llm_client.py
-         -> models.py
+      -> src/job_fit_analyzer/ui.py
+         -> analyzer.py
+            -> llm_client.py
+            -> models.py
 
-- `models.py`: Pydantic contracts for responsibilities, source constraints,
+- `src/job_fit_analyzer/models.py`: Pydantic contracts for responsibilities, source constraints,
   focused location review, and the final decision.
-- `llm_client.py`: OpenAI-compatible Structured Output boundary, evidence
+- `src/job_fit_analyzer/llm_client.py`: OpenAI-compatible Structured Output boundary, evidence
   chunking, provider Schema normalization, and typed request/response errors.
-- `analyzer.py`: extraction prompt, deterministic policy, conditional location
+- `src/job_fit_analyzer/analyzer.py`: extraction prompt, deterministic policy, conditional location
   reviewer, and JSONL run logging.
-- `app.py`: Gradio interface and presentation only.
+- `src/job_fit_analyzer/ui.py`: Gradio interface and presentation.
+- `app.py`: thin local launch entrypoint.
 - `scripts/run_evaluation.py`: batch runner for the 33 saved real JDs.
 - `scripts/fetch_full_job_descriptions.py`: refreshes official job text.
 
@@ -59,7 +61,7 @@ completeness or activity-label accuracy.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install .
 ```
 
 Configure OpenRouter:

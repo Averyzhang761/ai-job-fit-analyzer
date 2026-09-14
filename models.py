@@ -8,20 +8,9 @@ from pydantic import (
     Field,
     StrictBool,
     ValidationInfo,
-    computed_field,
     field_validator,
     model_validator,
 )
-
-
-class RoleType(str, Enum):
-    PRODUCT_FACING_AIE = "Product-facing AIE"
-    INTERNAL_FACING_AIE = "Internal-facing AIE"
-    FDE = "FDE"
-    RESEARCH_ML = "Research/ML role"
-    ML_HEAVY_AIE = "ML-heavy AIE"
-    PLATFORM_HEAVY_AIE = "platform-heavy AIE"
-    NOT_FIT = "not fit"
 
 
 class Recommendation(str, Enum):
@@ -42,117 +31,6 @@ class WorkArrangement(str, Enum):
     REMOTE = "remote"
     MIXED = "mixed"
     UNKNOWN = "unknown"
-
-
-class EvidenceField(str, Enum):
-    ROLE_TYPE = "role_type"
-    AI_APPLICATION = "ai_application"
-    PRODUCT_FACING = "product_facing"
-    LOCATION = "location"
-    WORK_AUTHORIZATION = "work_authorization"
-    INFRASTRUCTURE = "infrastructure"
-
-
-class EvidenceItem(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
-
-    field: EvidenceField
-    quote: str = Field(
-        min_length=1,
-        validation_alias=AliasChoices("evidence_id", "quote"),
-    )
-
-    @field_validator("quote", mode="before")
-    @classmethod
-    def resolve_quote(cls, value: str, info: ValidationInfo) -> str:
-        evidence_map = (info.context or {}).get("evidence_map")
-        if evidence_map is not None:
-            if value not in evidence_map:
-                raise ValueError(f"evidence_id 不存在：{value}")
-            return evidence_map[value]
-        return value.strip()
-
-
-class WorkAuthorizationResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    sponsorship_available: TernarySignal
-    citizenship_or_green_card_required: TernarySignal
-
-    @computed_field
-    @property
-    def status(self) -> TernarySignal:
-        if self.citizenship_or_green_card_required is TernarySignal.YES:
-            return TernarySignal.NO
-        if self.sponsorship_available is TernarySignal.YES:
-            return TernarySignal.YES
-        if self.sponsorship_available is TernarySignal.NO:
-            return TernarySignal.NO
-        return TernarySignal.UNKNOWN
-
-
-class HardFilterResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    ai_application: StrictBool
-    product_facing: StrictBool
-    bay_area_or_remote: TernarySignal
-    work_authorization: WorkAuthorizationResult
-    avoid_pure_infra: StrictBool
-
-
-class ModelAssessment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    role_type: RoleType
-    hard_filter_result: HardFilterResult
-    evidence: list[EvidenceItem] = Field(min_length=1)
-    risks: list[str]
-    confidence: float = Field(gt=0, le=1, strict=True)
-
-    @field_validator("risks")
-    @classmethod
-    def clean_risks(cls, risks: list[str]) -> list[str]:
-        return [risk.strip() for risk in risks if risk.strip()]
-
-    @model_validator(mode="after")
-    def validate_evidence_quotes(self, info: ValidationInfo) -> Self:
-        job_description = (info.context or {}).get("job_description")
-        if not job_description:
-            return self
-        missing = [
-            item.quote for item in self.evidence if item.quote not in job_description
-        ]
-        if missing:
-            raise ValueError(
-                "Evidence quote 必须逐字存在于原始 JD：" + "; ".join(missing)
-            )
-        return self
-
-
-class JobAnalysis(ModelAssessment):
-    fit_score: int = Field(ge=0, le=100, strict=True)
-    score_reasons: list[str] = Field(min_length=1)
-    needs_human_review: StrictBool
-    recommendation: Recommendation
-
-    @model_validator(mode="after")
-    def validate_consistency(self) -> Self:
-        hard_filters = self.hard_filter_result
-        if self.recommendation is Recommendation.SKIP and self.needs_human_review:
-            raise ValueError("skip 与 needs_human_review=true 的终态矛盾")
-        if self.recommendation is Recommendation.HUMAN_REVIEW:
-            if not self.needs_human_review:
-                raise ValueError("human_review 必须对应 needs_human_review=true")
-        if self.role_type is RoleType.PLATFORM_HEAVY_AIE:
-            if hard_filters.product_facing:
-                raise ValueError("platform-heavy AIE 不能同时是 product-facing")
-            if hard_filters.avoid_pure_infra:
-                raise ValueError("platform-heavy AIE 必须标记为未避开纯基础设施")
-        if self.role_type is RoleType.RESEARCH_ML:
-            if hard_filters.ai_application or hard_filters.product_facing:
-                raise ValueError("Research/ML role 与应用或产品向信号矛盾")
-        return self
 
 
 class RemoteScope(str, Enum):
@@ -177,6 +55,17 @@ class CitizenshipStatement(str, Enum):
     NOT_STATED = "not_stated"
 
 
+class WorkActivity(str, Enum):
+    CUSTOMER_IMPLEMENTATION = "customer_implementation"
+    CUSTOMER_ADVISORY = "customer_advisory"
+    PRODUCT_DEVELOPMENT = "product_development"
+    INTERNAL_TOOLS = "internal_tools"
+    MODEL_ENGINEERING = "model_engineering"
+    RESEARCH = "research"
+    AI_INFRASTRUCTURE = "ai_infrastructure"
+    GENERAL_SOFTWARE = "general_software"
+
+
 class SourceLocationFacts(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -192,25 +81,7 @@ class SourceWorkAuthorizationFacts(BaseModel):
     citizenship_or_green_card: CitizenshipStatement
 
 
-class CandidateLocationJudgment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    candidate_location_eligible: TernarySignal
-    reason: str = Field(min_length=1)
-
-
-class WorkActivity(str, Enum):
-    CUSTOMER_IMPLEMENTATION = "customer_implementation"
-    CUSTOMER_ADVISORY = "customer_advisory"
-    PRODUCT_DEVELOPMENT = "product_development"
-    INTERNAL_TOOLS = "internal_tools"
-    MODEL_ENGINEERING = "model_engineering"
-    RESEARCH = "research"
-    AI_INFRASTRUCTURE = "ai_infrastructure"
-    GENERAL_SOFTWARE = "general_software"
-
-
-class ResponsibilityItemV6(BaseModel):
+class Responsibility(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     quote: str = Field(
@@ -221,7 +92,7 @@ class ResponsibilityItemV6(BaseModel):
 
     @field_validator("quote", mode="before")
     @classmethod
-    def resolve_responsibility_quote(cls, value: str, info: ValidationInfo) -> str:
+    def resolve_quote(cls, value: str, info: ValidationInfo) -> str:
         evidence_map = (info.context or {}).get("evidence_map")
         if evidence_map is not None:
             if value not in evidence_map:
@@ -229,18 +100,30 @@ class ResponsibilityItemV6(BaseModel):
             return evidence_map[value]
         return value.strip()
 
+    @field_validator("activities")
+    @classmethod
+    def deduplicate_activities(
+        cls, activities: list[WorkActivity]
+    ) -> list[WorkActivity]:
+        return list(dict.fromkeys(activities))
 
-class SourceFactsV6(BaseModel):
+
+class JobFacts(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    responsibilities: list[ResponsibilityItemV6] = Field(min_length=1)
+    responsibilities: list[Responsibility] = Field(min_length=1)
     location: SourceLocationFacts
     work_authorization: SourceWorkAuthorizationFacts
     risks: list[str]
     confidence: float = Field(gt=0, le=1, strict=True)
 
+    @field_validator("risks")
+    @classmethod
+    def clean_risks(cls, risks: list[str]) -> list[str]:
+        return [risk.strip() for risk in risks if risk.strip()]
+
     @model_validator(mode="after")
-    def validate_responsibility_quotes(self, info: ValidationInfo) -> Self:
+    def validate_quotes(self, info: ValidationInfo) -> Self:
         job_description = (info.context or {}).get("job_description")
         if not job_description:
             return self
@@ -257,21 +140,32 @@ class SourceFactsV6(BaseModel):
         return self
 
 
-class JobDecisionV6(BaseModel):
+class CandidateLocationJudgment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    facts: SourceFactsV6
-    activity_tags: frozenset[WorkActivity]
+    candidate_location_eligible: TernarySignal
+    reason: str = Field(min_length=1)
+
+
+class JobDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    facts: JobFacts
+    activity_tags: list[WorkActivity]
     candidate_location_eligible: TernarySignal
     work_authorization_eligible: TernarySignal
     recommendation: Recommendation
     needs_human_review: StrictBool
     decision_reasons: list[str] = Field(min_length=1)
 
+    @field_validator("activity_tags")
+    @classmethod
+    def deduplicate_tags(cls, tags: list[WorkActivity]) -> list[WorkActivity]:
+        return list(dict.fromkeys(tags))
+
     @model_validator(mode="after")
-    def validate_v6_terminal_state(self) -> Self:
-        if self.needs_human_review != (
-            self.recommendation is Recommendation.HUMAN_REVIEW
-        ):
+    def validate_terminal_state(self) -> Self:
+        expected = self.recommendation is Recommendation.HUMAN_REVIEW
+        if self.needs_human_review != expected:
             raise ValueError("human_review 与 needs_human_review 必须保持一致")
         return self

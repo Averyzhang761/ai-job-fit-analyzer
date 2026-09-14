@@ -1,28 +1,40 @@
+import json
 import os
 import re
-import json
 from copy import deepcopy
 from typing import TypeVar
 
 from openai import APIConnectionError, APITimeoutError, APIStatusError, OpenAI
 from pydantic import BaseModel
 
-from errors import ModelOutputTruncatedError, ModelRequestError, ModelResponseError
-from models import ModelAssessment
-
 
 StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
-
 
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-4.1-mini"
 DEFAULT_RUNPOD_MODEL = "Qwen/Qwen3-8B"
-USER_PROMPT_TEMPLATE = """Analyze this job description for fit using the
-classification, evidence, and risk rules in the system message.
+USER_PROMPT_TEMPLATE = """Use the source IDs in this job description as the
+evidence references required by the response schema.
 
 Job description:
 {job_description}
 """
+
+
+class JobAnalyzerError(Exception):
+    error_type = "application_error"
+
+
+class ModelRequestError(JobAnalyzerError):
+    error_type = "request_error"
+
+
+class ModelResponseError(JobAnalyzerError):
+    error_type = "response_error"
+
+
+class ModelOutputTruncatedError(ModelResponseError):
+    error_type = "output_truncated"
 
 
 def _status_error_detail(exc: APIStatusError) -> str:
@@ -52,8 +64,7 @@ def openai_compatible_json_schema(response_model: type[BaseModel]) -> dict:
     def resolve(ref: str):
         value = schema
         for part in ref.removeprefix("#/").split("/"):
-            part = part.replace("~1", "/").replace("~0", "~")
-            value = value[part]
+            value = value[part.replace("~1", "/").replace("~0", "~")]
         return deepcopy(value)
 
     def normalize(node):
@@ -76,7 +87,7 @@ def build_evidence_chunks(job_description: str) -> tuple[str, dict[str, str]]:
         line = raw_line.strip()
         if not line:
             continue
-        parts = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\"“])", line)
+        parts = re.split(r'(?<=[.!?])\s+(?=[A-Z0-9"“])', line)
         chunks.extend(part.strip() for part in parts if part.strip())
 
     evidence_map = {
@@ -88,36 +99,19 @@ def build_evidence_chunks(job_description: str) -> tuple[str, dict[str, str]]:
     return annotated, evidence_map
 
 
-def parse_model_assessment_json(
-    model_text: str,
-    job_description: str | None = None,
-    evidence_map: dict[str, str] | None = None,
-) -> ModelAssessment:
-    context = {}
-    if job_description:
-        context["job_description"] = job_description
-    if evidence_map is not None:
-        context["evidence_map"] = evidence_map
-    return ModelAssessment.model_validate_json(
-        model_text,
-        context=context or None,
-    )
-
-
 def call_structured_llm(
     job_description: str,
     system_prompt: str,
     response_model: type[StructuredModel],
     schema_name: str,
-    temperature: float = DEFAULT_TEMPERATURE,
-    max_tokens: int = 500,
+    max_tokens: int,
     task_context: str | None = None,
 ) -> StructuredModel:
-    annotated_job_description, evidence_map = build_evidence_chunks(job_description)
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
-    if openrouter_api_key:
+    annotated_job, evidence_map = build_evidence_chunks(job_description)
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+    if openrouter_key:
         base_url = "https://openrouter.ai/api/v1"
-        api_key = openrouter_api_key
+        api_key = openrouter_key
         model = os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
         provider_options = {"provider": {"require_parameters": True}}
     else:
@@ -128,13 +122,11 @@ def call_structured_llm(
 
     if not base_url:
         raise ModelRequestError(
-            "缺少模型配置：请设置 OPENROUTER_API_KEY，或配置 RUNPOD_BASE_URL。"
+            "请设置 OPENROUTER_API_KEY，或配置 RUNPOD_BASE_URL。"
         )
 
     api_base = base_url if base_url.endswith("/v1") else base_url + "/v1"
-    user_content = USER_PROMPT_TEMPLATE.format(
-        job_description=annotated_job_description
-    )
+    user_content = USER_PROMPT_TEMPLATE.format(job_description=annotated_job)
     if task_context:
         user_content += "\nAdditional task context:\n" + task_context
 
@@ -144,12 +136,9 @@ def call_structured_llm(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": user_content,
-                },
+                {"role": "user", "content": user_content},
             ],
-            temperature=float(temperature),
+            temperature=DEFAULT_TEMPERATURE,
             max_tokens=int(max_tokens),
             stream=False,
             response_format={
@@ -168,7 +157,7 @@ def call_structured_llm(
         raise ModelRequestError("无法连接模型服务。") from exc
     except APIStatusError as exc:
         detail = _status_error_detail(exc)
-        suffix = f"原因：{detail}" if detail else ""
+        suffix = f" 原因：{detail}" if detail else ""
         raise ModelRequestError(
             f"模型服务返回 HTTP {exc.status_code}。{suffix}"
         ) from exc
@@ -193,20 +182,4 @@ def call_structured_llm(
             "job_description": job_description,
             "evidence_map": evidence_map,
         },
-    )
-
-
-def call_llm(
-    job_description: str,
-    system_prompt: str,
-    temperature: float = DEFAULT_TEMPERATURE,
-    max_tokens: int = 500,
-) -> ModelAssessment:
-    return call_structured_llm(
-        job_description,
-        system_prompt,
-        ModelAssessment,
-        "job_analysis",
-        temperature=temperature,
-        max_tokens=max_tokens,
     )

@@ -1,7 +1,7 @@
 [project]
 name = "ai-job-fit-analyzer"
 version = "0.2.0"
-description = "Structured-output AI job fit analyzer with deterministic decisions."
+description = "Evidence-first AI job fit analyzer with deterministic decisions."
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "gradio==6.26.0",
@@ -14,13 +14,8 @@ dev = []
 
 [tool.setuptools]
 py-modules = [
-    "analysis_service",
+    "analyzer",
     "app",
-    "business_rules",
-    "errors",
-    "evaluation",
     "llm_client",
     "models",
-    "run_log",
-    "run_baseline",
 ]

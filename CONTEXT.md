@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-An explicit statement about work the role performs. V6 stores the exact source
+An explicit statement about work the role performs. The current pipeline stores the exact source
 quotation and one or more activity tags for each responsibility. A real role can
 contain several activities, so responsibilities are not collapsed into one
 exclusive role category.

@@ -9,3 +9,5 @@ gradio-env/
 results*.csv
 output/
 .playwright-cli/
+*.egg-info/
+build/

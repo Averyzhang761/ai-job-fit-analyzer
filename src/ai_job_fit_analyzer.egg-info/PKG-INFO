@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: ai-job-fit-analyzer
-Version: 0.2.0
-Summary: Evidence-first AI job fit analyzer with deterministic decisions.
-Requires-Python: <3.14,>=3.11
-Requires-Dist: gradio==6.26.0
-Requires-Dist: openai==2.16.0
-Requires-Dist: pydantic==2.12.5
-Provides-Extra: dev
